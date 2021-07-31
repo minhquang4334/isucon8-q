@@ -293,11 +293,29 @@ module Torb
       end
 
       user['recent_reservations'] = recent_reservations
-      user['total_price'] = db.xquery('SELECT IFNULL(SUM(e.price + s.price), 0) AS total_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND r.canceled_at IS NULL', user['id']).first['total_price']
+      user_reser = db.xquery('SELECT r.*, e.price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND not_canceled', user['id']).to_a
+      # user['total_price'] = db.xquery('SELECT r.*, e.price as price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND not_canceled', user['id']).to_a['total_price']
+      total_price = 0
+      user_reser.each do |r|
+        total_price = total_price + r['price']
+        sheet = get_sheet(r['sheet_id'])
+        total_price = total_price + sheet[:price]
+      end
+      user['total_price'] = total_price
 
       rows = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(last_updated_at) DESC LIMIT 5', user['id'])
+      event_ids = rows.map { |r| r['event_id'] }
+      unless event_ids.empty?
+      	target_events = db.query("SELECT * FROM events WHERE id IN (#{event_ids.join(',')})").to_a
+      	#return target_events.to_json
+        #return get_event_detail(target_events).to_json
+        events = get_event_detail(target_events).map do |row|
+          [row['id'], row]
+      	end.to_h
+      end
       recent_events = rows.map do |row|
-        event = get_event(row['event_id'])
+        # event = get_event(row['event_id'])
+        event = events[row['event_id']]
         event['sheets'].each { |_, sheet| sheet.delete('detail') }
         event
       end
