@@ -74,7 +74,7 @@ module Torb
         events
       end
 
-      def get_event_detail(events)
+      def get_event_detail(events, login_user_id = nil)
         return [] if events.empty?
         event_ids = events.map { |e| e['id'] }
 
@@ -82,7 +82,7 @@ module Torb
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num').to_a
         sheets_by_id = sheets.group_by { |s| s['id'] }
         reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids}) AND not_canceled = 1 GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
-          [row['event_id'], row['sheet_id'], row]
+          [row['event_id'], [row['sheet_id'], row]]
         end.to_h
 
         results = events.map do |event|
