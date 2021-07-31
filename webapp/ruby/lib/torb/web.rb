@@ -97,8 +97,8 @@ module Torb
 
         # zero fill
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num').to_a
-        reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids.join(',')}) AND not_canceled = 1 GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
-          [row['event_id'], [row['sheet_id'], row]]
+        reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids.join(',')}) AND not_canceled GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
+          ["#{row['event_id']}_#{row['sheet_id']}", row]]
         end.to_h
 
         events.map do |event|
@@ -112,13 +112,14 @@ module Torb
         end
 
         events.each do |event|
-          reservation_event = reservations[event['id']]
           sheets.each do |sheet|
             event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
             event['total'] += 1
             event['sheets'][sheet['rank']]['total'] += 1
             #reservation = reservation_event[sheet['id']]
-            if reservation_event && reservation_event[sheet['id']]
+            key = "#{event['id']}_#{sheet['id']}"
+            reservation = reservations[key]
+            if reservation
               reservation = reservation_event[sheet['id']]
               sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
               sheet['reserved']    = true
