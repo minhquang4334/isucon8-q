@@ -474,13 +474,14 @@ module Torb
       event.to_json
     end
 
-    def get_rank_num_from_id(sheet_id)
+    def get_sheet(sheet_id)
       s_rank_num = 50
       a_rank_num = 200
       b_rank_num = 500
       c_rank_num = 1000
       rank = 'S'
       num = 0
+      price = 0
       if sheet_id <= s_rank_num
         rank = 'S'
         num = sheet_id - s_rank_num
@@ -510,7 +511,7 @@ module Torb
 
       reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
       reports = reservations.map do |reservation|
-        sheet = get_rank_num_price_from_id(reservation['sheet_id'])
+        sheet = get_sheet(reservation['sheet_id'])
         {
           reservation_id: reservation['id'],
           event_id:       event['id'],
