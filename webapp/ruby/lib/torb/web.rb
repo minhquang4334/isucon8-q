@@ -370,11 +370,11 @@ module Torb
 
       sheet = nil
       reservation_id = nil
-      sheet_ids = db.xquery("SELECT sheet_id FROM reservations WHERE event_id = #{event['id']} AND not_canceled = 0 FOR UPDATE").map do |row|
+      sheet_ids = db.xquery("SELECT sheet_id FROM reservations WHERE event_id = #{event['id']} AND not_canceled FOR UPDATE").map do |row|
         row['sheet_id']
       end
       halt_with_error 409, 'sold_out' if sheet_ids.empty?
-      sheets = db.xquery("SELECT * FROM sheets WHERE id IN (#{sheet_ids.join(',')}) AND `rank` = ?", rank).to_a
+      sheets = db.xquery("SELECT * FROM sheets WHERE id NOT IN (#{sheet_ids.join(',')}) AND `rank` = ?", rank).to_a
       loop do
         sheet = sheets.sample
         halt_with_error 409, 'sold_out' unless sheet
