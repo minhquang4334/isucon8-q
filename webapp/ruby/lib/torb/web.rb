@@ -515,12 +515,12 @@ module Torb
         {
           reservation_id: reservation['id'],
           event_id:       event['id'],
-          rank:           sheet['rank'],
-          num:            sheet['num'],
+          rank:           sheet[:rank],
+          num:            sheet[:num],
           user_id:        reservation['user_id'],
           sold_at:        reservation['reserved_at'].iso8601,
           canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + sheet['price'],
+          price:          reservation['event_price'] + sheet[:price],
         }
       end
 
