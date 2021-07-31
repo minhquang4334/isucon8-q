@@ -262,9 +262,16 @@ module Torb
         halt_with_error 403, 'forbidden'
       end
 
-      rows = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id WHERE r.user_id = ? ORDER BY last_updated_at DESC LIMIT 5', user['id'])
+      rows = db.xquery('SELECT r.* FROM reservations r WHERE r.user_id = ? ORDER BY last_updated_at DESC LIMIT 5', user['id'])
+      event_ids = rows.map { |r| r['event_id'] }
+      target_events = db.query("SELECT * FROM events WHERE id IN (#{event_ids.join(',')})")
+      events = get_events(target_events).map do |row|
+        [row['id'], row]
+      end.to_h
       recent_reservations = rows.map do |row|
-        event = get_event(row['event_id'])
+        sheet = get_sheet(row['sheet_id'])
+        # event = get_event(row['event_id'])
+        event = events[row['event_id']]
         price = event['sheets'][row['sheet_rank']]['price']
         event.delete('sheets')
         event.delete('total')
@@ -273,8 +280,8 @@ module Torb
         {
           id:          row['id'],
           event:       event,
-          sheet_rank:  row['sheet_rank'],
-          sheet_num:   row['sheet_num'],
+          sheet_rank:  sheet[:rank],
+          sheet_num:   sheet[:num],
           price:       price,
           reserved_at: row['reserved_at'].to_i,
           canceled_at: row['canceled_at']&.to_i,
