@@ -59,15 +59,67 @@ module Torb
 
         db.query('BEGIN')
         begin
-          event_ids = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).map { |e| e['id'] }
-          events = event_ids.map do |event_id|
-            event = get_event(event_id)
+          event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
+          events = get_event_detail(event_list).map do |event|
             event['sheets'].each { |sheet| sheet.delete('detail') }
             event
           end
           db.query('COMMIT')
         rescue
           db.query('ROLLBACK')
+        end
+
+        events
+      end
+
+      def get_event_detail(events, login_user_id = nil)
+        return [] if events.empty?
+        event_ids = events.map { |e| e['id'] }
+
+        # zero fill
+        sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num').to_a
+        reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids.join(',')}) AND not_canceled GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
+          ["#{row['event_id']}_#{row['sheet_id']}", row]]
+        end.to_h
+
+        events.map do |event|
+          event['total']   = 0
+          event['remains'] = 0
+          event['sheets'] = {}
+          %w[S A B C].each do |rank|
+            event['sheets'][rank] = { 'total' => 0, 'remains' => 0, 'detail' => [] }
+          end
+          event
+        end
+
+        events.each do |event|
+          sheets.each do |sheet|
+            event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
+            event['total'] += 1
+            event['sheets'][sheet['rank']]['total'] += 1
+            #reservation = reservation_event[sheet['id']]
+            key = "#{event['id']}_#{sheet['id']}"
+            reservation = reservations[key]
+            if reservation
+              sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
+              sheet['reserved']    = true
+              sheet['reserved_at'] = reservation['reserved_at'].to_i
+            else
+              event['remains'] += 1
+              event['sheets'][sheet['rank']]['remains'] += 1
+            end
+
+            event['sheets'][sheet['rank']]['detail'].push(sheet)
+          end
+
+          event['public'] = event.delete('public_fg')
+          event['closed'] = event.delete('closed_fg')
+          event
+        end
+        sheets.each do |sheet|
+          sheet.delete('id')
+          sheet.delete('price')
+          sheet.delete('rank')
         end
 
         events
@@ -88,6 +140,7 @@ module Torb
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num')
         sheets.each do |sheet|
           event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
+          #event['sheets'][sheet['rank']]['price'] ||= 0
           event['total'] += 1
           event['sheets'][sheet['rank']]['total'] += 1
 
@@ -131,7 +184,7 @@ module Torb
       def get_login_administrator
         administrator_id = session['administrator_id']
         return unless administrator_id
-        db.xquery('SELECT id, nickname FROM administrators WHERE id = ?', administrator_id).first
+        db.xquery('SELECT id, nickname FROM administrators WHERE id = ? LIMIT 1', administrator_id).first
       end
 
       def validate_rank(rank)
