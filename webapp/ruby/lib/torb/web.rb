@@ -101,7 +101,7 @@ module Torb
           [row['event_id'], [row['sheet_id'], row]]
         end.to_h
 
-        event_with_sheets = events.map do |event|
+        events.map do |event|
           event['total']   = 0
           event['remains'] = 0
           event['sheets'] = {}
@@ -111,7 +111,7 @@ module Torb
           event
         end
 
-        event_with_sheets.each do |event|
+        events.each do |event|
           reservation_event = reservations[event['id']]
           sheets.each do |sheet|
             event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
