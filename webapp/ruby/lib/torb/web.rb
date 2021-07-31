@@ -114,6 +114,7 @@ module Torb
         events.each do |event|
           reservation_event = reservations[event['id']]
           sheets.each do |sheet|
+            return 
             event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
             event['total'] += 1
             event['sheets'][sheet['rank']]['total'] += 1
@@ -128,15 +129,16 @@ module Torb
             end
 
             event['sheets'][sheet['rank']]['detail'].push(sheet)
-
-            sheet.delete('id')
-            sheet.delete('price')
-            sheet.delete('rank')
           end
 
           event['public'] = event.delete('public_fg')
           event['closed'] = event.delete('closed_fg')
           event
+        end
+        sheets.each do |sheet|
+          sheet.delete('id')
+          sheet.delete('price')
+          sheet.delete('rank')
         end
 
         event_with_sheets
