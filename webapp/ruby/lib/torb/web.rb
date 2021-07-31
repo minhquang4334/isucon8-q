@@ -79,7 +79,7 @@ module Torb
         # zero fill
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num').to_a
         reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids.join(',')}) AND not_canceled GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
-          ["#{row['event_id']}_#{row['sheet_id']}", row]]
+          ["#{row['event_id']}_#{row['sheet_id']}", row]
         end.to_h
 
         events.map do |event|
