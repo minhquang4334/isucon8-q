@@ -3,10 +3,10 @@ require 'sinatra/base'
 require 'erubi'
 require 'mysql2'
 require 'mysql2-cs-bind'
-require 'rack-mini-profiler'
+# require 'rack-mini-profiler'
 module Torb
   class Web < Sinatra::Base
-    use Rack::MiniProfiler
+    # use Rack::MiniProfiler
     configure :development do
       require 'sinatra/reloader'
       register Sinatra::Reloader
