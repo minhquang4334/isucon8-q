@@ -41,11 +41,11 @@ module Torb
     helpers do
       def db
         Thread.current[:db] ||= Mysql2::Client.new(
-          host: ENV['DB_HOST'],
+          host: '172.31.32.40',
           port: ENV['DB_PORT'],
-          username: ENV['DB_USER'],
-          password: ENV['DB_PASS'],
-          database: ENV['DB_DATABASE'],
+          username: 'isucon',
+          password: 'isucon',
+          database: 'torb',
           database_timezone: :utc,
           cast_booleans: true,
           reconnect: true,
