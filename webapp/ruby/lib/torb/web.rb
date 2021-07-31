@@ -352,6 +352,7 @@ module Torb
     get '/api/events/:id' do |event_id|
       user = get_login_user || {}
       target_events = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'not_found' if target_events.nil?
       event = get_event_detail([target_events], user['id']).first
       halt_with_error 404, 'not_found' if event.nil? || !event['public']
 
@@ -363,18 +364,19 @@ module Torb
       rank = body_params['sheet_rank']
 
       user  = get_login_user
-      target_events = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
-      event = get_event_detail([target_events], user['id']).first
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'invalid_event' unless event
+      event = get_event_detail([event], user['id']).first
+      #event = get_event_detail([target_events], user['id']).first
       halt_with_error 404, 'invalid_event' unless event && event['public']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
-
       sheet = nil
       reservation_id = nil
       sheet_ids = db.xquery("SELECT sheet_id FROM reservations WHERE event_id = #{event['id']} AND not_canceled FOR UPDATE").map do |row|
         row['sheet_id']
       end
       #halt_with_error 409, 'sold_out' if sheet_ids.empty?
-      where_in = sheet_ids.empty? ? "NOT IN (#{sheet_ids.join(',')})" : ""
+      where_in = sheet_ids.empty? ? "" : "NOT IN (#{sheet_ids.join(',')})"
       sheets = db.xquery("SELECT * FROM sheets WHERE id #{where_in} AND `rank` = ?", rank).to_a
       loop do
         sheet = sheets.sample
