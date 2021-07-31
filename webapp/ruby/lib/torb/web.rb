@@ -474,16 +474,43 @@ module Torb
       event.to_json
     end
 
+    def get_rank_num_from_id(sheet_id)
+      s_rank_num = 50
+      a_rank_num = 200
+      b_rank_num = 500
+      c_rank_num = 1000
+      rank = 'S'
+      num = 0
+      if sheet_id <= s_rank_num
+        rank = 'S'
+        num = sheet_id - s_rank_num
+      elsif sheet_id <= a_rank_num
+        rank = 'A'
+        num = sheet_id - s_rank_num
+      elsif sheet_id <= b_rank_num
+        rank = 'B'
+        num = sheet_id - s_rank_num
+      else sheet_id <= c_rank_num
+        rank = 'C'
+        num = sheet_id - s_rank_num
+      end
+      {
+        rank: rank,
+        num: num
+      }
+    end
+
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
       event = get_event(event_id)
 
-      reservations = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
+      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
       reports = reservations.map do |reservation|
+        sheet = get_rank_num_from_id(reservation['sheet_id'])
         {
           reservation_id: reservation['id'],
           event_id:       event['id'],
-          rank:           reservation['sheet_rank'],
-          num:            reservation['sheet_num'],
+          rank:           sheet['rank'],
+          num:            sheet['num'],
           user_id:        reservation['user_id'],
           sold_at:        reservation['reserved_at'].iso8601,
           canceled_at:    reservation['canceled_at']&.iso8601 || '',
