@@ -484,19 +484,19 @@ module Torb
       price = 0
       if sheet_id <= s_rank_num
         rank = 'S'
-        num = s_rank_num - sheet_id
+        num = sheet_id - 0
         price = 5000
       elsif sheet_id <= a_rank_num
         rank = 'A'
-        num = a_rank_num - sheet_id
+        num = sheet_id - s_rank_num
         price = 3000
       elsif sheet_id <= b_rank_num
         rank = 'B'
-        num = b_rank_num - sheet_id
+        num = sheet_id - a_rank_num
         price = 1000
       else sheet_id <= c_rank_num
         rank = 'C'
-        num = c_rank_num - sheet_id
+        num = sheet_id - b_rank_num
         price = 0
       end
       {
