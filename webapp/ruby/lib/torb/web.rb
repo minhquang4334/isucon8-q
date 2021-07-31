@@ -111,7 +111,7 @@ module Torb
           event
         end
 
-        results = event_with_sheets.map do |event|
+        event_with_sheets.each do |event|
           reservation_event = reservations[event['id']]
           sheets.each do |sheet|
             event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
@@ -139,7 +139,7 @@ module Torb
           event
         end
 
-        results
+        event_with_sheets
       end
 
       def get_event(event_id, login_user_id = nil)
@@ -157,6 +157,7 @@ module Torb
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num')
         sheets.each do |sheet|
           event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
+          #event['sheets'][sheet['rank']]['price'] ||= 0
           event['total'] += 1
           event['sheets'][sheet['rank']]['total'] += 1
 
