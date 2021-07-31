@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     not_canceled BOOLEAN AS (ISNULL(canceled_at)) PERSISTENT,
     KEY event_id_and_sheet_id_idx (event_id, sheet_id, not_canceled),
     KEY user_id_and_last_updated_at (user_id, last_updated_at),
+    KEY user_id_and_event_id (user_id, event_id, last_updated_at),
     KEY user_id_and_not_canceled(user_id, not_canceled),
     KEY event_id_reserved_at(event_id, reserved_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
