@@ -61,8 +61,8 @@ module Torb
         begin
           event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
           event_ids = event_list.map { |e| e['id'] }
-          events = get_event_detail(event_list)
-          events = event_list.map do |event|
+          e = get_event_detail(event_list)
+          events = e.map do |event|
             event['sheets'].each { |sheet| sheet.delete('detail') }
             event
           end
@@ -75,13 +75,13 @@ module Torb
       end
 
       def get_event_detail(events)
-        return events.empty?
-        event_ids = event_list.map { |e| e['id'] }
+        return [] if events.empty?
+        event_ids = events.map { |e| e['id'] }
 
         # zero fill
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num').to_a
         sheets_by_id = sheets.group_by { |s| s['id'] }
-        reservations = db.xquery("SELECT * FROM reservations WHERE id IN (#{event_ids})not_canceled = 1 GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
+        reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids}) AND not_canceled = 1 GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
           [row['event_id'], row['sheet_id'], row]
         end.to_h
 
