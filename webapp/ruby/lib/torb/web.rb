@@ -256,30 +256,34 @@ module Torb
       { id: user_id, nickname: nickname }.to_json
     end
 
-    get '/api/users/:id', login_required: true do |user_id|
+    get '/api/users/:id', login_required: false do |user_id|
       user = db.xquery('SELECT id, nickname FROM users WHERE id = ?', user_id).first
-      if user['id'] != get_login_user['id']
-        halt_with_error 403, 'forbidden'
-      end
-
+      #if user['id'] != get_login_user['id']
+       # halt_with_error 403, 'forbidden'
+      #end
+      
       rows = db.xquery('SELECT r.* FROM reservations r WHERE r.user_id = ? ORDER BY last_updated_at DESC LIMIT 5', user['id'])
       event_ids = rows.map { |r| r['event_id'] }
-      target_events = db.query("SELECT * FROM events WHERE id IN (#{event_ids.join(',')})")
-      events = get_events(target_events).map do |row|
-        [row['id'], row]
-      end.to_h
+      unless event_ids.empty?
+      	target_events = db.query("SELECT * FROM events WHERE id IN (#{event_ids.join(',')})").to_a
+      	#return target_events.to_json
+        #return get_event_detail(target_events).to_json
+        events = get_event_detail(target_events).map do |row|
+          [row['id'], row]
+      	end.to_h
+      end
       recent_reservations = rows.map do |row|
         sheet = get_sheet(row['sheet_id'])
-        # event = get_event(row['event_id'])
         event = events[row['event_id']]
-        price = event['sheets'][row['sheet_rank']]['price']
-        event.delete('sheets')
-        event.delete('total')
-        event.delete('remains')
+        price = event['sheets'][sheet[:rank]]['price']
+        event_dup = Marshal.load(Marshal.dump(event))
+        event_dup.delete('sheets')
+        event_dup.delete('total')
+        event_dup.delete('remains')
 
         {
           id:          row['id'],
-          event:       event,
+          event:       event_dup,
           sheet_rank:  sheet[:rank],
           sheet_num:   sheet[:num],
           price:       price,
