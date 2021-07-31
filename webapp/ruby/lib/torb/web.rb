@@ -79,9 +79,7 @@ module Torb
         db.query('BEGIN')
         begin
           event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
-          event_ids = event_list.map { |e| e['id'] }
-          e = get_event_detail(event_list)
-          events = e.map do |event|
+          events = get_event_detail(event_list).map do |event|
             event['sheets'].each { |sheet| sheet.delete('detail') }
             event
           end
@@ -90,7 +88,7 @@ module Torb
           db.query('ROLLBACK')
         end
 
-        events
+        get_event_detail(event_list)
       end
 
       def get_event_detail(events, login_user_id = nil)
@@ -99,8 +97,7 @@ module Torb
 
         # zero fill
         sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num').to_a
-        sheets_by_id = sheets.group_by { |s| s['id'] }
-        reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids}) AND not_canceled = 1 GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
+        reservations = db.xquery("SELECT * FROM reservations WHERE event_id IN (#{event_ids.join(',')}) AND not_canceled = 1 GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)").map do |row|
           [row['event_id'], [row['sheet_id'], row]]
         end.to_h
 
@@ -117,7 +114,7 @@ module Torb
             event['total'] += 1
             event['sheets'][sheet['rank']]['total'] += 1
             reservation = reservation_event[sheet['id']]
-            if reservation.present?
+            if reservation
               sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
               sheet['reserved']    = true
               sheet['reserved_at'] = reservation['reserved_at'].to_i
@@ -434,7 +431,7 @@ module Torb
     end
 
     get '/admin/api/events', admin_login_required: true do
-      events = get_events(->(_) { true })
+      events = get_events_for_login(->(_) { true })
       events.to_json
     end
 
