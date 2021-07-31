@@ -59,25 +59,6 @@ module Torb
 
         db.query('BEGIN')
         begin
-          event_ids = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).map { |e| e['id'] }
-          events = event_ids.map do |event_id|
-            event = get_event(event_id)
-            event['sheets'].each { |sheet| sheet.delete('detail') }
-            event
-          end
-          db.query('COMMIT')
-        rescue
-          db.query('ROLLBACK')
-        end
-
-        events
-      end
-
-      def get_events_for_login(where = nil)
-        where ||= ->(e) { e['public_fg'] }
-
-        db.query('BEGIN')
-        begin
           event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
           events = get_event_detail(event_list).map do |event|
             event['sheets'].each { |sheet| sheet.delete('detail') }
@@ -90,6 +71,24 @@ module Torb
 
         events
       end
+
+      # def get_events(where = nil)
+      #   where ||= ->(e) { e['public_fg'] }
+
+      #   db.query('BEGIN')
+      #   begin
+      #     event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
+      #     events = get_event_detail(event_list).map do |event|
+      #       event['sheets'].each { |sheet| sheet.delete('detail') }
+      #       event
+      #     end
+      #     db.query('COMMIT')
+      #   rescue
+      #     db.query('ROLLBACK')
+      #   end
+
+      #   events
+      # end
 
       def get_event_detail(events, login_user_id = nil)
         return [] if events.empty?
@@ -120,7 +119,6 @@ module Torb
             key = "#{event['id']}_#{sheet['id']}"
             reservation = reservations[key]
             if reservation
-              reservation = reservation_event[sheet['id']]
               sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
               sheet['reserved']    = true
               sheet['reserved_at'] = reservation['reserved_at'].to_i
@@ -414,7 +412,7 @@ module Torb
 
     get '/admin/' do
       @administrator = get_login_administrator
-      @events = get_events_for_login(->(_) { true }) if @administrator
+      @events = get_events(->(_) { true }) if @administrator
 
       erb :admin
     end
@@ -439,7 +437,7 @@ module Torb
     end
 
     get '/admin/api/events', admin_login_required: true do
-      events = get_events_for_login(->(_) { true })
+      events = get_events(->(_) { true })
       events.to_json
     end
 
