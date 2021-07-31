@@ -72,24 +72,6 @@ module Torb
         events
       end
 
-      # def get_events(where = nil)
-      #   where ||= ->(e) { e['public_fg'] }
-
-      #   db.query('BEGIN')
-      #   begin
-      #     event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
-      #     events = get_event_detail(event_list).map do |event|
-      #       event['sheets'].each { |sheet| sheet.delete('detail') }
-      #       event
-      #     end
-      #     db.query('COMMIT')
-      #   rescue
-      #     db.query('ROLLBACK')
-      #   end
-
-      #   events
-      # end
-
       def get_event_detail(events, login_user_id = nil)
         return [] if events.empty?
         event_ids = events.map { |e| e['id'] }
