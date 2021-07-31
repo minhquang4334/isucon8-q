@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     canceled_at DATETIME(6)      DEFAULT NULL,
     last_updated_at DATETIME(6) AS (IFNULL(canceled_at, reserved_at)),
     is_canceled BOOLEAN NOT NULL AS (ISNULL(canceled_at)),
-    KEY event_id_and_sheet_id_idx (event_id, is_canceled, sheet_id),
+    KEY event_id_and_sheet_id_idx (event_id, sheet_id, is_canceled),
     KEY user_id_and_last_updated_at (user_id, last_updated_at),
     KEY user_id_and_is_canceled(user_id, is_canceled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
