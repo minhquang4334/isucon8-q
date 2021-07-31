@@ -351,8 +351,8 @@ module Torb
 
     get '/api/events/:id' do |event_id|
       user = get_login_user || {}
-      target_events = db.query("SELECT * FROM events WHERE id = #{event_id}").to_a
-      event = (target_events, user['id'])
+      target_events = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      event = get_event_detail([target_events], user['id']).first
       halt_with_error 404, 'not_found' if event.nil? || !event['public']
 
       event = sanitize_event(event)
@@ -363,7 +363,8 @@ module Torb
       rank = body_params['sheet_rank']
 
       user  = get_login_user
-      event = get_event_detail(event_id, user['id']).first
+      target_events = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      event = get_event_detail([target_events], user['id']).first
       halt_with_error 404, 'invalid_event' unless event && event['public']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
 
