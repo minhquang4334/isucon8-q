@@ -88,7 +88,7 @@ module Torb
           db.query('ROLLBACK')
         end
 
-        get_event_detail(event_list)
+        events
       end
 
       def get_event_detail(events, login_user_id = nil)
@@ -114,12 +114,12 @@ module Torb
         events.each do |event|
           reservation_event = reservations[event['id']]
           sheets.each do |sheet|
-            return 
             event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
             event['total'] += 1
             event['sheets'][sheet['rank']]['total'] += 1
-            reservation = reservation_event[sheet['id']]
-            if reservation
+            #reservation = reservation_event[sheet['id']]
+            if reservation_event && reservation_event[sheet['id']]
+              reservation = reservation_event[sheet['id']]
               sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
               sheet['reserved']    = true
               sheet['reserved_at'] = reservation['reserved_at'].to_i
@@ -141,7 +141,7 @@ module Torb
           sheet.delete('rank')
         end
 
-        event_with_sheets
+        events
       end
 
       def get_event(event_id, login_user_id = nil)
