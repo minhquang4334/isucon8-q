@@ -3,6 +3,8 @@ require 'sinatra/base'
 require 'erubi'
 require 'mysql2'
 require 'mysql2-cs-bind'
+require 'csv'
+
 # require 'rack-mini-profiler'
 module Torb
   class Web < Sinatra::Base
@@ -524,45 +526,52 @@ module Torb
     end
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
-      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
-      halt_with_error 404, 'not_found' if event.nil?
-      event = get_event_detail([event]).first
-
-      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
-      reports = reservations.map do |reservation|
-        sheet = get_sheet(reservation['sheet_id'])
-        {
-          reservation_id: reservation['id'],
-          event_id:       event['id'],
-          rank:           sheet[:rank],
-          num:            sheet[:num],
-          user_id:        reservation['user_id'],
-          sold_at:        reservation['reserved_at'].iso8601,
-          canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + sheet[:price],
-        }
+      keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
+      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event_id, :stream => true)
+      csv_enumerator = Enumerator.new do |csv|
+        csv << CSV.generate_line(keys)
+        reservations.each do |reservation|
+          sheet = get_sheet(reservation['sheet_id'])
+          csv << CSV.generate_line([
+            reservation['id'],
+            reservation['event_id'],
+            sheet[:rank],
+            sheet[:num],
+            reservation['event_price'] + sheet[:price],
+            reservation['user_id'],
+            reservation['reserved_at'].iso8601,
+            reservation['canceled_at']&.iso8601 || ''
+          ])
+        end
       end
-
-      render_report_csv(reports)
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
-      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE')
-      reports = reservations.map do |reservation|
-        sheet = get_sheet(reservation['sheet_id'])
-        {
-          reservation_id: reservation['id'],
-          event_id:       reservation['event_id'],
-          rank:           sheet[:rank],
-          num:            sheet[:num],
-          user_id:        reservation['user_id'],
-          sold_at:        reservation['reserved_at'].iso8601,
-          canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + sheet[:price],
-        }
+      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE', :stream => true)
+      # reports = reports.sort_by { |report| report[:sold_at] }
+      keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
+      headers({
+        'Content-Type'        => 'text/csv; charset=UTF-8',
+        'Content-Disposition' => 'attachment; filename="report.csv"',
+        'X-Accel-Buffering'   => 'no',
+        'Cache-Control'       => 'no-cache'
+      })
+      csv_enumerator = Enumerator.new do |csv|
+        csv << CSV.generate_line(keys)
+        reservations.each do |reservation|
+          sheet = get_sheet(reservation['sheet_id'])
+          csv << CSV.generate_line([
+            reservation['id'],
+            reservation['event_id'],
+            sheet[:rank],
+            sheet[:num],
+            reservation['event_price'] + sheet[:price],
+            reservation['user_id'],
+            reservation['reserved_at'].iso8601,
+            reservation['canceled_at']&.iso8601 || ''
+          ])
+        end
       end
-
-      render_report_csv(reports)
     end
   end
 end
