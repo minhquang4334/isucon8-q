@@ -365,10 +365,7 @@ module Torb
 
       user  = get_login_user
       event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
-      halt_with_error 404, 'invalid_event' unless event
-      event = get_event_detail([event], user['id']).first
-      #event = get_event_detail([target_events], user['id']).first
-      halt_with_error 404, 'invalid_event' unless event && event['public']
+      halt_with_error 404, 'invalid_event' unless event && event['public_fg']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
       sheet = nil
       reservation_id = nil
