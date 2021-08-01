@@ -187,8 +187,56 @@ module Torb
         db.xquery('SELECT id, nickname FROM administrators WHERE id = ? LIMIT 1', administrator_id).first
       end
 
+      def get_sheet(sheet_id)
+        s_rank_num = 50
+        a_rank_num = 200
+        b_rank_num = 500
+        c_rank_num = 1000
+        rank = 'S'
+        num = 0
+        price = 0
+        if sheet_id <= s_rank_num
+          rank = 'S'
+          num = sheet_id - 0
+          price = 5000
+        elsif sheet_id <= a_rank_num
+          rank = 'A'
+          num = sheet_id - s_rank_num
+          price = 3000
+        elsif sheet_id <= b_rank_num
+          rank = 'B'
+          num = sheet_id - a_rank_num
+          price = 1000
+        else sheet_id <= c_rank_num
+          rank = 'C'
+          num = sheet_id - b_rank_num
+          price = 0
+        end
+        {
+          rank: rank,
+          num: num,
+          price: price
+        }
+      end
+
+      def get_total_sheet_from_rank(rank)
+        case rank
+        when 'S'
+          return 50
+        when 'A'
+          return 150
+        when 'B'
+          return 300
+        when 'C'
+          return 500
+        else
+          return 0
+        end
+      end
+
       def validate_rank(rank)
-        db.xquery('SELECT COUNT(*) AS total_sheets FROM sheets WHERE `rank` = ?', rank).first['total_sheets'] > 0
+        # db.xquery('SELECT COUNT(*) AS total_sheets FROM sheets WHERE `rank` = ?', rank).first['total_sheets'] > 0
+        get_total_sheet_from_rank(rank) > 0
       end
 
       def body_params
@@ -515,38 +563,6 @@ module Torb
       event = get_event_detail([event]).first
       # event = get_event(event_id)
       event.to_json
-    end
-
-    def get_sheet(sheet_id)
-      s_rank_num = 50
-      a_rank_num = 200
-      b_rank_num = 500
-      c_rank_num = 1000
-      rank = 'S'
-      num = 0
-      price = 0
-      if sheet_id <= s_rank_num
-        rank = 'S'
-        num = sheet_id - 0
-        price = 5000
-      elsif sheet_id <= a_rank_num
-        rank = 'A'
-        num = sheet_id - s_rank_num
-        price = 3000
-      elsif sheet_id <= b_rank_num
-        rank = 'B'
-        num = sheet_id - a_rank_num
-        price = 1000
-      else sheet_id <= c_rank_num
-        rank = 'C'
-        num = sheet_id - b_rank_num
-        price = 0
-      end
-      {
-        rank: rank,
-        num: num,
-        price: price
-      }
     end
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
