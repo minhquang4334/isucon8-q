@@ -475,15 +475,16 @@ module Torb
       rescue
         db.query('ROLLBACK')
       end
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
       event&.to_json
     end
 
     get '/admin/api/events/:id', admin_login_required: true do |event_id|
       event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
       halt_with_error 404, 'not_found' if event.nil?
-      event = get_event_detail([event], user['id']).first
+      event = get_event_detail([event]).first
       halt_with_error 404, 'not_found' unless event
 
       event.to_json
@@ -493,13 +494,13 @@ module Torb
       public = body_params['public'] || false
       closed = body_params['closed'] || false
       public = false if closed
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # event = get_event(event_id)
       halt_with_error 404, 'not_found' unless event
 
-      if event['closed']
+      if event['closed_fg']
         halt_with_error 400, 'cannot_edit_closed_event'
-      elsif event['public'] && closed
+      elsif event['public_fg'] && closed
         halt_with_error 400, 'cannot_close_public_event'
       end
 
@@ -511,7 +512,8 @@ module Torb
         db.query('ROLLBACK')
       end
 
-      event = get_event(event_id)
+      event = get_event_detail([event]).first
+      # event = get_event(event_id)
       event.to_json
     end
 
@@ -548,7 +550,9 @@ module Torb
     end
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
 
       reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
       reports = reservations.map do |reservation|
