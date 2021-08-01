@@ -365,10 +365,7 @@ module Torb
 
       user  = get_login_user
       event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
-      halt_with_error 404, 'invalid_event' unless event
-      event = get_event_detail([event], user['id']).first
-      #event = get_event_detail([target_events], user['id']).first
-      halt_with_error 404, 'invalid_event' unless event && event['public']
+      halt_with_error 404, 'invalid_event' unless event && event['public_fg']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
       sheet = nil
       reservation_id = nil
@@ -401,16 +398,19 @@ module Torb
 
     delete '/api/events/:id/sheets/:rank/:num/reservation', login_required: true do |event_id, rank, num|
       user  = get_login_user
-      event = get_event(event_id, user['id'])
-      halt_with_error 404, 'invalid_event' unless event && event['public']
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # halt_with_error 404, 'invalid_event' unless event
+      # event = get_event_detail([event], user['id']).first
+      halt_with_error 404, 'invalid_event' unless event && event['public_fg']
       halt_with_error 404, 'invalid_rank'  unless validate_rank(rank)
 
-      sheet = db.xquery('SELECT * FROM sheets WHERE `rank` = ? AND num = ?', rank, num).first
+      sheet = db.xquery('SELECT * FROM sheets WHERE `rank` = ? AND num = ? LIMIT 1', rank, num).first
       halt_with_error 404, 'invalid_sheet' unless sheet
 
       db.query('BEGIN')
       begin
-        reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE', event['id'], sheet['id']).first
+        # reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND not_canceled GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE', event['id'], sheet['id']).first
+        reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND not_canceled ORDER BY reserved_at LIMIT 1 FOR UPDATE', event['id'], sheet['id']).first
         unless reservation
           db.query('ROLLBACK')
           halt_with_error 400, 'not_reserved'
@@ -475,13 +475,16 @@ module Torb
       rescue
         db.query('ROLLBACK')
       end
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
       event&.to_json
     end
 
     get '/admin/api/events/:id', admin_login_required: true do |event_id|
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
       halt_with_error 404, 'not_found' unless event
 
       event.to_json
@@ -491,13 +494,13 @@ module Torb
       public = body_params['public'] || false
       closed = body_params['closed'] || false
       public = false if closed
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # event = get_event(event_id)
       halt_with_error 404, 'not_found' unless event
 
-      if event['closed']
+      if event['closed_fg']
         halt_with_error 400, 'cannot_edit_closed_event'
-      elsif event['public'] && closed
+      elsif event['public_fg'] && closed
         halt_with_error 400, 'cannot_close_public_event'
       end
 
@@ -509,7 +512,8 @@ module Torb
         db.query('ROLLBACK')
       end
 
-      event = get_event(event_id)
+      event = get_event_detail([event]).first
+      # event = get_event(event_id)
       event.to_json
     end
 
@@ -546,7 +550,9 @@ module Torb
     end
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
 
       reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
       reports = reservations.map do |reservation|
