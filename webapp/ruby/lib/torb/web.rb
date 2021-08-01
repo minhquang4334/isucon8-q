@@ -576,8 +576,7 @@ module Torb
         'Content-Type'        => 'text/csv; charset=UTF-8',
         'Content-Disposition' => 'attachment; filename="report.csv"',
         'X-Accel-Buffering'   => 'no',
-        'Cache-Control'       => 'no-cache',
-        'Transfer-Encoding'   => 'chunked'
+        'Cache-Control'       => 'no-cache'
       })
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
