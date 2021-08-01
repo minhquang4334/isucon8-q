@@ -6,6 +6,7 @@ gem 'erubi'
 gem 'mysql2'
 gem 'mysql2-cs-bind'
 gem 'rack-mini-profiler'
+gem 'redis'
 
 group :development do
   gem 'sinatra-contrib'
