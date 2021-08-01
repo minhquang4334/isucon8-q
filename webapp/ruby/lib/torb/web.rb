@@ -3,6 +3,8 @@ require 'sinatra/base'
 require 'erubi'
 require 'mysql2'
 require 'mysql2-cs-bind'
+require 'csv'
+
 # require 'rack-mini-profiler'
 module Torb
   class Web < Sinatra::Base
@@ -581,8 +583,19 @@ module Torb
           price:          reservation['event_price'] + sheet[:price],
         }
       end
-
-      render_report_csv(reports)
+      # reports = reports.sort_by { |report| report[:sold_at] }
+      keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
+      headers = keys.join(',')
+      headers({
+        'Content-Type'        => 'text/csv; charset=UTF-8',
+        'Content-Disposition' => 'attachment; filename="report.csv"',
+      })
+      body = CSV.generate("new_films.csv", "w") do |csv|
+        csv << headers
+        reports.each do |report|
+          csv << report.values_at(*keys).join(',')
+        end
+      end
     end
   end
 end

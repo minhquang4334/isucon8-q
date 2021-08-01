@@ -5,3 +5,4 @@ perl/
 php/
 python/
 ruby/.bundle
+ruby/vendor
