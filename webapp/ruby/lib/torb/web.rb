@@ -4,6 +4,7 @@ require 'erubi'
 require 'mysql2'
 require 'mysql2-cs-bind'
 require 'csv'
+require 'enumerator'
 
 # require 'rack-mini-profiler'
 module Torb
@@ -554,6 +555,7 @@ module Torb
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
         reservations.each do |reservation|
+          sheet = get_sheet(reservation['sheet_id'])
           csv << CSV.generate_line([
             reservation['id'],
             reservation['event_id'],
@@ -581,20 +583,22 @@ module Torb
       })
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
-        reservations.each do |reservation|
-          csv << CSV.generate_line([
-            reservation['id'],
-            reservation['event_id'],
-            sheet[:rank],
-            sheet[:num],
-            reservation['event_price'] + sheet[:price],
-            reservation['user_id'],
-            reservation['reserved_at'].iso8601,
-            reservation['canceled_at']&.iso8601 || ''
-          ])
+        reservations.each_slice(1000) do |rs|
+          rs.each do |reservation|
+            sheet = get_sheet(reservation['sheet_id'])
+            csv << CSV.generate_line([
+              reservation['id'],
+              reservation['event_id'],
+              sheet[:rank],
+              sheet[:num],
+              reservation['event_price'] + sheet[:price],
+              reservation['user_id'],
+              reservation['reserved_at'].iso8601,
+              reservation['canceled_at']&.iso8601 || ''
+            ])
+          end
         end
       end
-      csv_enumerator
     end
   end
 end
