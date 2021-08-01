@@ -549,7 +549,7 @@ module Torb
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
-      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'], :stream => true)
+      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event_id, :stream => true)
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
         reservations.each do |reservation|
