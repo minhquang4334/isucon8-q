@@ -551,21 +551,22 @@ module Torb
       event = get_event(event_id)
 
       reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
-      reports = reservations.map do |reservation|
-        sheet = get_sheet(reservation['sheet_id'])
-        {
-          reservation_id: reservation['id'],
-          event_id:       event['id'],
-          rank:           sheet[:rank],
-          num:            sheet[:num],
-          user_id:        reservation['user_id'],
-          sold_at:        reservation['reserved_at'].iso8601,
-          canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + sheet[:price],
-        }
+      body = CSV.open('report.csv', 'a') do |csv|
+        csv << keys
+        reservations.each do |reservation|
+          sheet = get_sheet(reservation['sheet_id'])
+          csv << [
+            reservation['id'],
+            reservation['event_id'],
+            sheet[:rank],
+            sheet[:num],
+            reservation['event_price'] + sheet[:price],
+            reservation['user_id'],
+            reservation['reserved_at'].iso8601,
+            reservation['canceled_at']&.iso8601 || ''
+          ]
+        end
       end
-
-      render_report_csv(reports)
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
@@ -576,7 +577,7 @@ module Torb
         'Content-Type'        => 'text/csv; charset=UTF-8',
         'Content-Disposition' => 'attachment; filename="report.csv"',
       })
-      body = CSV.generate do |csv|
+      body = CSV.open('report.csv', 'a') do |csv|
         csv << keys
         reservations.each do |reservation|
           sheet = get_sheet(reservation['sheet_id'])
