@@ -136,12 +136,14 @@ module Torb
       def get_login_user
         user_id = session[:user_id]
         return unless user_id
+        return session[:user] if session[:user]
         db.xquery('SELECT id, nickname FROM users WHERE id = ?', user_id).first
       end
 
       def get_login_administrator
         administrator_id = session['administrator_id']
         return unless administrator_id
+        return session[:admin] if session[:admin]
         db.xquery('SELECT id, nickname FROM administrators WHERE id = ? LIMIT 1', administrator_id).first
       end
 
@@ -340,6 +342,7 @@ module Torb
       halt_with_error 401, 'authentication_failed' if user.nil? || pass_hash != user['pass_hash']
 
       session['user_id'] = user['id']
+      session['user'] = user
 
       user = get_login_user
       user.to_json
@@ -453,6 +456,7 @@ module Torb
       halt_with_error 401, 'authentication_failed' if administrator.nil? || pass_hash != administrator['pass_hash']
 
       session['administrator_id'] = administrator['id']
+      session['admin'] = administrator
 
       administrator = get_login_administrator
       administrator.to_json
