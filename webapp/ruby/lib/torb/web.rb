@@ -4,7 +4,6 @@ require 'erubi'
 require 'mysql2'
 require 'mysql2-cs-bind'
 require 'csv'
-require 'enumerator'
 
 # require 'rack-mini-profiler'
 module Torb
@@ -555,7 +554,6 @@ module Torb
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
         reservations.each do |reservation|
-          sheet = get_sheet(reservation['sheet_id'])
           csv << CSV.generate_line([
             reservation['id'],
             reservation['event_id'],
@@ -579,25 +577,25 @@ module Torb
         'Content-Type'        => 'text/csv; charset=UTF-8',
         'Content-Disposition' => 'attachment; filename="report.csv"',
         'X-Accel-Buffering'   => 'no',
-        'Cache-Control'       => 'no-cache'
+        'Cache-Control'       => 'no-cache',
+        'Transfer-Encoding'   => 'chunked'
       })
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
-        reservations.each_slice(1000) do |rs|
-          rs.each do |reservation|
-            sheet = get_sheet(reservation['sheet_id'])
-            csv << CSV.generate_line([
-              reservation['id'],
-              reservation['event_id'],
-              sheet[:rank],
-              sheet[:num],
-              reservation['event_price'] + sheet[:price],
-              reservation['user_id'],
-              reservation['reserved_at'].iso8601,
-              reservation['canceled_at']&.iso8601 || ''
-            ])
-          end
+        reservations.each do |reservation|
+          sheet = get_sheet(reservation['sheet_id'])
+          csv << CSV.generate_line([
+            reservation['id'],
+            reservation['event_id'],
+            sheet[:rank],
+            sheet[:num],
+            reservation['event_price'] + sheet[:price],
+            reservation['user_id'],
+            reservation['reserved_at'].iso8601,
+            reservation['canceled_at']&.iso8601 || ''
+          ])
         end
+        reservations = nil
       end
     end
   end
