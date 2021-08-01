@@ -551,11 +551,10 @@ module Torb
       event = get_event(event_id)
 
       reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
-      body = CSV.open('report.csv', 'a') do |csv|
-        csv << keys
+      csv_enumerator = Enumerator.new do |csv|
+        csv << CSV.generate_line(keys)
         reservations.each do |reservation|
-          sheet = get_sheet(reservation['sheet_id'])
-          csv << [
+          csv << CSV.generate_line([
             reservation['id'],
             reservation['event_id'],
             sheet[:rank],
@@ -564,9 +563,10 @@ module Torb
             reservation['user_id'],
             reservation['reserved_at'].iso8601,
             reservation['canceled_at']&.iso8601 || ''
-          ]
+          ])
         end
       end
+      csv_enumerator
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
@@ -594,6 +594,7 @@ module Torb
           ])
         end
       end
+      csv_enumerator
     end
   end
 end
