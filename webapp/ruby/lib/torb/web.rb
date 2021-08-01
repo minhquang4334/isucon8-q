@@ -372,7 +372,7 @@ module Torb
       rank = body_params['sheet_rank']
 
       user  = get_login_user
-      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      event = db.query("SELECT * FROM events WHERE id = #{event_id}").first
       halt_with_error 404, 'invalid_event' unless event && event['public_fg']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
       sheet = nil
@@ -547,7 +547,7 @@ module Torb
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
-      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE', :stream => true)
+      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC', :stream => true)
       # reports = reports.sort_by { |report| report[:sold_at] }
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
       headers({
