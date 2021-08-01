@@ -570,30 +570,26 @@ module Torb
 
     get '/admin/api/reports/sales', admin_login_required: true do
       reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE')
-      reports = reservations.map do |reservation|
-        sheet = get_sheet(reservation['sheet_id'])
-        {
-          reservation_id: reservation['id'],
-          event_id:       reservation['event_id'],
-          rank:           sheet[:rank],
-          num:            sheet[:num],
-          user_id:        reservation['user_id'],
-          sold_at:        reservation['reserved_at'].iso8601,
-          canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + sheet[:price],
-        }
-      end
       # reports = reports.sort_by { |report| report[:sold_at] }
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
-      headers = keys.join(',')
       headers({
         'Content-Type'        => 'text/csv; charset=UTF-8',
         'Content-Disposition' => 'attachment; filename="report.csv"',
       })
-      body = CSV.generate("new_films.csv", "w") do |csv|
-        csv << headers
-        reports.each do |report|
-          csv << report.values_at(*keys).join(',')
+      body = CSV.generate do |csv|
+        csv << keys
+        reservations.each do |reservation|
+          sheet = get_sheet(reservation['sheet_id'])
+          csv << [
+            reservation['id'],
+            reservation['event_id'],
+            sheet[:rank],
+            sheet[:num],
+            reservation['event_price'] + sheet[:price],
+            reservation['user_id'],
+            reservation['reserved_at'].iso8601,
+            reservation['canceled_at']&.iso8601 || ''
+          ]
         end
       end
     end
