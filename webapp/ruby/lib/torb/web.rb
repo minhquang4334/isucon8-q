@@ -127,48 +127,6 @@ module Torb
         events
       end
 
-      def get_event(event_id, login_user_id = nil)
-        event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
-        return unless event
-
-        # zero fill
-        event['total']   = 0
-        event['remains'] = 0
-        event['sheets'] = {}
-        %w[S A B C].each do |rank|
-          event['sheets'][rank] = { 'total' => 0, 'remains' => 0, 'detail' => [] }
-        end
-
-        sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num')
-        sheets.each do |sheet|
-          event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
-          #event['sheets'][sheet['rank']]['price'] ||= 0
-          event['total'] += 1
-          event['sheets'][sheet['rank']]['total'] += 1
-
-          reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event['id'], sheet['id']).first
-          if reservation
-            sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
-            sheet['reserved']    = true
-            sheet['reserved_at'] = reservation['reserved_at'].to_i
-          else
-            event['remains'] += 1
-            event['sheets'][sheet['rank']]['remains'] += 1
-          end
-
-          event['sheets'][sheet['rank']]['detail'].push(sheet)
-
-          sheet.delete('id')
-          sheet.delete('price')
-          sheet.delete('rank')
-        end
-
-        event['public'] = event.delete('public_fg')
-        event['closed'] = event.delete('closed_fg')
-
-        event
-      end
-
       def sanitize_event(event)
         sanitized = event.dup  # shallow clone
         sanitized.delete('price')
@@ -189,8 +147,56 @@ module Torb
         db.xquery('SELECT id, nickname FROM administrators WHERE id = ? LIMIT 1', administrator_id).first
       end
 
+      def get_sheet(sheet_id)
+        s_rank_num = 50
+        a_rank_num = 200
+        b_rank_num = 500
+        c_rank_num = 1000
+        rank = 'S'
+        num = 0
+        price = 0
+        if sheet_id <= s_rank_num
+          rank = 'S'
+          num = sheet_id - 0
+          price = 5000
+        elsif sheet_id <= a_rank_num
+          rank = 'A'
+          num = sheet_id - s_rank_num
+          price = 3000
+        elsif sheet_id <= b_rank_num
+          rank = 'B'
+          num = sheet_id - a_rank_num
+          price = 1000
+        else sheet_id <= c_rank_num
+          rank = 'C'
+          num = sheet_id - b_rank_num
+          price = 0
+        end
+        {
+          rank: rank,
+          num: num,
+          price: price
+        }
+      end
+
+      def get_total_sheet_from_rank(rank)
+        case rank
+        when 'S'
+          return 50
+        when 'A'
+          return 150
+        when 'B'
+          return 300
+        when 'C'
+          return 500
+        else
+          return 0
+        end
+      end
+
       def validate_rank(rank)
-        db.xquery('SELECT COUNT(*) AS total_sheets FROM sheets WHERE `rank` = ?', rank).first['total_sheets'] > 0
+        # db.xquery('SELECT COUNT(*) AS total_sheets FROM sheets WHERE `rank` = ?', rank).first['total_sheets'] > 0
+        get_total_sheet_from_rank(rank) > 0
       end
 
       def body_params
@@ -367,10 +373,7 @@ module Torb
 
       user  = get_login_user
       event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
-      halt_with_error 404, 'invalid_event' unless event
-      event = get_event_detail([event], user['id']).first
-      #event = get_event_detail([target_events], user['id']).first
-      halt_with_error 404, 'invalid_event' unless event && event['public']
+      halt_with_error 404, 'invalid_event' unless event && event['public_fg']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
       sheet = nil
       reservation_id = nil
@@ -403,16 +406,19 @@ module Torb
 
     delete '/api/events/:id/sheets/:rank/:num/reservation', login_required: true do |event_id, rank, num|
       user  = get_login_user
-      event = get_event(event_id, user['id'])
-      halt_with_error 404, 'invalid_event' unless event && event['public']
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # halt_with_error 404, 'invalid_event' unless event
+      # event = get_event_detail([event], user['id']).first
+      halt_with_error 404, 'invalid_event' unless event && event['public_fg']
       halt_with_error 404, 'invalid_rank'  unless validate_rank(rank)
 
-      sheet = db.xquery('SELECT * FROM sheets WHERE `rank` = ? AND num = ?', rank, num).first
+      sheet = db.xquery('SELECT * FROM sheets WHERE `rank` = ? AND num = ? LIMIT 1', rank, num).first
       halt_with_error 404, 'invalid_sheet' unless sheet
 
       db.query('BEGIN')
       begin
-        reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE', event['id'], sheet['id']).first
+        # reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND not_canceled GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE', event['id'], sheet['id']).first
+        reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND not_canceled ORDER BY reserved_at LIMIT 1 FOR UPDATE', event['id'], sheet['id']).first
         unless reservation
           db.query('ROLLBACK')
           halt_with_error 400, 'not_reserved'
@@ -477,13 +483,16 @@ module Torb
       rescue
         db.query('ROLLBACK')
       end
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
       event&.to_json
     end
 
     get '/admin/api/events/:id', admin_login_required: true do |event_id|
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event]).first
       halt_with_error 404, 'not_found' unless event
 
       event.to_json
@@ -493,13 +502,13 @@ module Torb
       public = body_params['public'] || false
       closed = body_params['closed'] || false
       public = false if closed
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      # event = get_event(event_id)
       halt_with_error 404, 'not_found' unless event
 
-      if event['closed']
+      if event['closed_fg']
         halt_with_error 400, 'cannot_edit_closed_event'
-      elsif event['public'] && closed
+      elsif event['public_fg'] && closed
         halt_with_error 400, 'cannot_close_public_event'
       end
 
@@ -510,41 +519,10 @@ module Torb
       rescue
         db.query('ROLLBACK')
       end
-
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      event = get_event_detail([event]).first
+      # event = get_event(event_id)
       event.to_json
-    end
-
-    def get_sheet(sheet_id)
-      s_rank_num = 50
-      a_rank_num = 200
-      b_rank_num = 500
-      c_rank_num = 1000
-      rank = 'S'
-      num = 0
-      price = 0
-      if sheet_id <= s_rank_num
-        rank = 'S'
-        num = sheet_id - 0
-        price = 5000
-      elsif sheet_id <= a_rank_num
-        rank = 'A'
-        num = sheet_id - s_rank_num
-        price = 3000
-      elsif sheet_id <= b_rank_num
-        rank = 'B'
-        num = sheet_id - a_rank_num
-        price = 1000
-      else sheet_id <= c_rank_num
-        rank = 'C'
-        num = sheet_id - b_rank_num
-        price = 0
-      end
-      {
-        rank: rank,
-        num: num,
-        price: price
-      }
     end
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
