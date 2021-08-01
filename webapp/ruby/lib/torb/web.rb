@@ -576,12 +576,13 @@ module Torb
       headers({
         'Content-Type'        => 'text/csv; charset=UTF-8',
         'Content-Disposition' => 'attachment; filename="report.csv"',
+        'X-Accel-Buffering'   => 'no',
+        'Cache-Control'       => 'no-cache'
       })
-      body = CSV.open('report.csv', 'a') do |csv|
-        csv << keys
+      csv_enumerator = Enumerator.new do |csv|
+        csv << CSV.generate_line(keys)
         reservations.each do |reservation|
-          sheet = get_sheet(reservation['sheet_id'])
-          csv << [
+          csv << CSV.generate_line([
             reservation['id'],
             reservation['event_id'],
             sheet[:rank],
@@ -590,7 +591,7 @@ module Torb
             reservation['user_id'],
             reservation['reserved_at'].iso8601,
             reservation['canceled_at']&.iso8601 || ''
-          ]
+          ])
         end
       end
     end
