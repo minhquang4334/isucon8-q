@@ -481,7 +481,9 @@ module Torb
     end
 
     get '/admin/api/events/:id', admin_login_required: true do |event_id|
-      event = get_event(event_id)
+      event = db.query("SELECT * FROM events WHERE id = #{event_id} LIMIT 1").first
+      halt_with_error 404, 'not_found' if event.nil?
+      event = get_event_detail([event], user['id']).first
       halt_with_error 404, 'not_found' unless event
 
       event.to_json
