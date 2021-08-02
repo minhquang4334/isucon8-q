@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     KEY user_id_and_last_updated_at (user_id, last_updated_at),
     KEY user_id_and_event_id (user_id, event_id, last_updated_at),
     KEY user_id_and_not_canceled(user_id, not_canceled),
-    KEY event_id_reserved_at(event_id, reserved_at)
+    KEY reserved_at(reserved_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- 105 records
 -- SELECT id, nickname FROM administrators WHERE id = ?
