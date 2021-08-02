@@ -377,16 +377,11 @@ module Torb
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
       sheet = nil
       reservation_id = nil
-      sheet_ids = db.xquery("SELECT sheet_id FROM reservations WHERE event_id = #{event['id']} AND not_canceled FOR UPDATE").map do |row|
-        row['sheet_id']
-      end
-      #halt_with_error 409, 'sold_out' if sheet_ids.empty?
-      where_in = sheet_ids.empty? ? "" : "NOT IN (#{sheet_ids.join(',')})"
-      sheets = db.xquery("SELECT * FROM sheets WHERE id #{where_in} AND `rank` = ?", rank).to_a
       loop do
-        sheet = sheets.sample
-        halt_with_error 409, 'sold_out' unless sheet
         db.query('BEGIN')
+        sheet = db.xquery('SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND not_canceled) AND `rank` = ? ORDER BY RAND() LIMIT 1 FOR UPDATE', event['id'], rank).first
+        halt_with_error 409, 'sold_out' unless sheet
+        #db.query('BEGIN')
         begin
           db.xquery('INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)', event['id'], sheet['id'], user['id'], Time.now.utc.strftime('%F %T.%6N'))
           reservation_id = db.last_id
@@ -417,7 +412,6 @@ module Torb
 
       db.query('BEGIN')
       begin
-        # reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND not_canceled GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE', event['id'], sheet['id']).first
         reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND not_canceled ORDER BY reserved_at LIMIT 1 FOR UPDATE', event['id'], sheet['id']).first
         unless reservation
           db.query('ROLLBACK')
@@ -527,7 +521,7 @@ module Torb
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
-      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event_id, :stream => true)
+      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC', event_id, :stream => true)
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
         reservations.each do |reservation|
@@ -547,7 +541,7 @@ module Torb
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
-      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE', :stream => true)
+      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC', :stream => true)
       # reports = reports.sort_by { |report| report[:sold_at] }
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
       headers({
