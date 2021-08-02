@@ -14,7 +14,7 @@ module Torb
       require 'sinatra/reloader'
       register Sinatra::Reloader
     end
-    system "redis-cli FLUSHALL"
+
     set :redis, Redis.new(:host => ENV.fetch('REDIS_HOST', '127.0.0.1'), :port => ENV.fetch('REDIS_PORT', 6379))
     set :root, File.expand_path('../..', __dir__)
     set :sessions, key: 'torb_session', expire_after: 3600
@@ -63,11 +63,7 @@ module Torb
 
         db.query('BEGIN')
         begin
-          event_list = redis.get('event_list')
-          if event_list
-            event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
-            redis.set('event_list', event_list)
-          end
+          event_list = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).to_a
           events = get_event_detail(event_list).map do |event|
             event['sheets'].each { |sheet| sheet.delete('detail') }
             event
@@ -242,6 +238,7 @@ module Torb
 
     get '/initialize' do
       system "../../db/init.sh"
+      system "/usr/local/bin/redis-cli FLUSHALL"
 
       status 204
     end
@@ -483,7 +480,6 @@ module Torb
       begin
         db.xquery('INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)
         ', title, public, price)
-        redis.del('event_list')
         event_id = db.last_id
         db.query('COMMIT')
       rescue
