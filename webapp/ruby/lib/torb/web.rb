@@ -379,7 +379,7 @@ module Torb
       reservation_id = nil
       loop do
         db.query('BEGIN')
-        sheet = db.xquery('SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND not_canceled FOR UPDATE) AND `rank` = ? ORDER BY RAND() LIMIT 1 FOR UPDATE', event['id'], rank).first
+        sheet = db.xquery('SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND not_canceled) AND `rank` = ? ORDER BY RAND() LIMIT 1 FOR UPDATE', event['id'], rank).first
         halt_with_error 409, 'sold_out' unless sheet
         #db.query('BEGIN')
         begin
@@ -521,7 +521,7 @@ module Torb
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
-      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event_id, :stream => true)
+      reservations = db.xquery('SELECT r.*, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC', event_id, :stream => true)
       csv_enumerator = Enumerator.new do |csv|
         csv << CSV.generate_line(keys)
         reservations.each do |reservation|
@@ -541,7 +541,7 @@ module Torb
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
-      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE', :stream => true)
+      reservations = db.query('SELECT r.*, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC', :stream => true)
       # reports = reports.sort_by { |report| report[:sold_at] }
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
       headers({
