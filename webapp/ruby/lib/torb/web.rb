@@ -377,9 +377,14 @@ module Torb
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
       sheet = nil
       reservation_id = nil
+      sheet_ids = db.xquery("SELECT sheet_id FROM reservations WHERE event_id = #{event['id']} AND not_canceled = 0").map do |row|
+        row['sheet_id']
+      end
       # halt_with_error 409, 'sold_out' if sheet_ids.empty?
+      where_in = sheet_ids.empty? ? "" : "id NOT IN (#{sheet_ids.join(',')}) AND"
+      # sheets = db.xquery("SELECT * FROM sheets WHERE id #{where_in} AND `rank` = ?", rank).to_a
       loop do
-        sheet = db.xquery('SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND not_canceled) AND `rank` = ? ORDER BY RAND() LIMIT 1 FOR UPDATE', event['id'], rank).first
+        sheet = db.xquery("SELECT * FROM sheets WHERE #{where_in} `rank` = ? ORDER BY RAND() LIMIT 1 FOR UPDATE", rank).first
         halt_with_error 409, 'sold_out' unless sheet
         db.query('BEGIN')
         begin
