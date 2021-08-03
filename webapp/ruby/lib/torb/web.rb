@@ -541,10 +541,10 @@ module Torb
     end
 
     get '/admin/api/reports/sales', admin_login_required: true do
-      reservations = db.query('SELECT r.* FROM reservations r ORDER BY reserved_at ASC', :stream => true)
       events = db.query('SELECT * FROM events').map do |row|
-        [row['id', row]]
+        [row['id'], row]
       end.to_h
+      reservations = db.query('SELECT r.* FROM reservations r ORDER BY reserved_at ASC')
       # reports = reports.sort_by { |report| report[:sold_at] }
       keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
       headers({
